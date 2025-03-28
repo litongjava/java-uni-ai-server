@@ -3,11 +3,11 @@ import com.litongjava.annotation.AComponentScan;
 import com.litongjava.tio.boot.TioApplication;
 
 @AComponentScan
-public class EnoteAdminApp {
+public class UniServerApp {
 
   public static void main(String[] args) {
     long start = System.currentTimeMillis();
-    TioApplication.run(EnoteAdminApp.class, args);
+    TioApplication.run(UniServerApp.class, args);
     long end = System.currentTimeMillis();
     System.out.println((end - start) + "(ms)");
   }
