@@ -14,9 +14,9 @@ public class OpenAiTTSClientTest {
   @Test
   public void testTTS() {
     EnvUtils.load();
-    ResponseVo responseVo = OpenAiTTSClient.speech("How are you");
+    ResponseVo responseVo = OpenAiTTSClient.speech("语音合成失败,请联系管理员");
     if(responseVo.isOk()){
-      FileUtil.writeBytes(responseVo.getBodyBytes(), new File("1.mp3"));
+      FileUtil.writeBytes(responseVo.getBodyBytes(), new File("default.mp3"));
     }else {
       System.out.println(responseVo.getBodyString());
     }

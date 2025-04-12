@@ -13,7 +13,10 @@ public class ManimTTSHandler {
   public HttpResponse index(HttpRequest request) {
     HttpResponse response = TioRequestContext.getResponse();
     String input = request.getParam("input");
-    byte[] audio = manimTTSService.tts(input);
+    String platform = request.getParam("platform");
+    String voice_id = request.getParam("voice_id");
+
+    byte[] audio = manimTTSService.tts(input, platform, voice_id);
     return Resps.bytesWithContentType(response, audio, "audio/mp3");
   }
 }
