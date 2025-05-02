@@ -11,6 +11,7 @@ import com.litongjava.openai.tts.OpenAiTTSClient;
 import com.litongjava.tio.utils.crypto.Md5Utils;
 import com.litongjava.tio.utils.hutool.FileUtil;
 import com.litongjava.tio.utils.hutool.StrUtil;
+import com.litongjava.tio.utils.lang.ChineseUtils;
 import com.litongjava.tio.utils.snowflake.SnowflakeIdUtils;
 import com.litongjava.uni.consts.TTSPlatform;
 import com.litongjava.uni.consts.UniTableName;
@@ -22,12 +23,22 @@ import lombok.extern.slf4j.Slf4j;
 public class ManimTTSService {
 
   public byte[] tts(String input, String provider, String voice_id) {
-    if (StrUtil.isBlank(provider)) {
-      provider = "openai";
+    if (ChineseUtils.containsChinese(input)) {
+      if (StrUtil.isBlank(provider)) {
+        provider = "volce";
+      }
+      if (StrUtil.isBlank(voice_id)) {
+        voice_id = "zh_male_beijingxiaoye_moon_bigtts";
+      }
+    } else {
+      if (StrUtil.isBlank(provider)) {
+        provider = "openai";
+      }
+      if (StrUtil.isBlank(voice_id)) {
+        voice_id = "shimmer";
+      }
     }
-    if (StrUtil.isBlank(voice_id)) {
-      voice_id = "shimmer";
-    }
+
     log.info("input:{},{},{}", input, provider, voice_id);
 
     String md5 = Md5Utils.getMD5(input);
