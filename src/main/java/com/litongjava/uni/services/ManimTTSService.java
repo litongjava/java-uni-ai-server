@@ -2,10 +2,15 @@ package com.litongjava.uni.services;
 
 import java.io.File;
 
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
+
 import com.litongjava.db.activerecord.Db;
 import com.litongjava.db.activerecord.Row;
 import com.litongjava.fishaudio.tts.FishAudioClient;
 import com.litongjava.fishaudio.tts.FishAudioTTSRequestVo;
+import com.litongjava.minimax.MiniMaxHttpClient;
+import com.litongjava.minimax.MiniMaxTTSResponse;
 import com.litongjava.model.http.response.ResponseVo;
 import com.litongjava.openai.tts.OpenAiTTSClient;
 import com.litongjava.tio.utils.crypto.Md5Utils;
@@ -23,22 +28,37 @@ import lombok.extern.slf4j.Slf4j;
 public class ManimTTSService {
 
   public byte[] tts(String input, String provider, String voice_id) {
+    //    if (ChineseUtils.containsChinese(input)) {
+    //      if (StrUtil.isBlank(provider)) {
+    //        provider = "volce";
+    //      }
+    //      if (StrUtil.isBlank(voice_id)) {
+    //        voice_id = "zh_male_beijingxiaoye_moon_bigtts";
+    //      }
+    //    } else {
+    //      if (StrUtil.isBlank(provider)) {
+    //        provider = "openai";
+    //      }
+    //      if (StrUtil.isBlank(voice_id)) {
+    //        voice_id = "shimmer";
+    //      }
+    //    }
+
     if (ChineseUtils.containsChinese(input)) {
       if (StrUtil.isBlank(provider)) {
-        provider = "volce";
+        provider = "minimax";
       }
       if (StrUtil.isBlank(voice_id)) {
-        voice_id = "zh_male_beijingxiaoye_moon_bigtts";
+        voice_id = "Chinese_Mandarin_Gentleman";
       }
     } else {
       if (StrUtil.isBlank(provider)) {
-        provider = "openai";
+        provider = "minimax";
       }
       if (StrUtil.isBlank(voice_id)) {
-        voice_id = "shimmer";
+        voice_id = "English_expressive_narrator ";
       }
     }
-
     log.info("input:{},{},{}", input, provider, voice_id);
 
     String md5 = Md5Utils.getMD5(input);
@@ -66,6 +86,7 @@ public class ManimTTSService {
     long id = SnowflakeIdUtils.id();
     String path = "cache" + File.separator + id + ".mp3";
 
+    File audioFile = new File(path);
     if (TTSPlatform.volce.equals(provider)) {
       bodyBytes = VolceTtsClient.tts(input);
 
@@ -82,8 +103,24 @@ public class ManimTTSService {
       } else {
         log.error(responseVo.getBodyString());
         path = "default.mp3";
-        return FileUtil.readBytes(new File(path));
+        return FileUtil.readBytes(audioFile);
       }
+    } else if (TTSPlatform.minimax.equals(provider)) {
+      MiniMaxTTSResponse speech = MiniMaxHttpClient.speech(input, voice_id);
+      String audio = speech.getData().getAudio();
+      
+      byte[] decodeToBytes;
+      
+      try {
+        decodeToBytes = Hex.decodeHex(audio);
+        FileUtil.writeBytes(decodeToBytes, audioFile);
+        return decodeToBytes;
+      } catch (DecoderException e) {
+        e.printStackTrace();
+        path = "default.mp3";
+        return FileUtil.readBytes(audioFile);
+      }
+
     } else {
       ResponseVo responseVo = OpenAiTTSClient.speech(input);
       if (responseVo.isOk()) {
@@ -91,11 +128,11 @@ public class ManimTTSService {
       } else {
         log.error(responseVo.getBodyString());
         path = "default.mp3";
-        return FileUtil.readBytes(new File(path));
+        return FileUtil.readBytes(audioFile);
       }
     }
 
-    File file = new File(path);
+    File file = audioFile;
     FileUtil.writeBytes(bodyBytes, file);
     Row saveRow = Row.by("id", id).set("input", input).set("md5", md5).set("path", path)
         //
