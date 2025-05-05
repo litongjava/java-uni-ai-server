@@ -5,6 +5,7 @@ WORKDIR /app
 
 # 复制 jar 文件到容器中
 COPY target/java-uni-ai-server-1.0.0.jar /app/
+COPY .env /app/.env
 COPY default.mp3 /app/default.mp3
 
 # 运行 jar 文件

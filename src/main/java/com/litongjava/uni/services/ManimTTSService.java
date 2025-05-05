@@ -11,6 +11,7 @@ import com.litongjava.fishaudio.tts.FishAudioClient;
 import com.litongjava.fishaudio.tts.FishAudioTTSRequestVo;
 import com.litongjava.minimax.MiniMaxHttpClient;
 import com.litongjava.minimax.MiniMaxTTSResponse;
+import com.litongjava.minimax.MiniMaxVoice;
 import com.litongjava.model.http.response.ResponseVo;
 import com.litongjava.openai.tts.OpenAiTTSClient;
 import com.litongjava.tio.utils.crypto.Md5Utils;
@@ -49,14 +50,14 @@ public class ManimTTSService {
         provider = "minimax";
       }
       if (StrUtil.isBlank(voice_id)) {
-        voice_id = "Chinese_Mandarin_Gentleman";
+        voice_id = MiniMaxVoice.Chinese_Mandarin_Gentleman;
       }
     } else {
       if (StrUtil.isBlank(provider)) {
         provider = "minimax";
       }
       if (StrUtil.isBlank(voice_id)) {
-        voice_id = "English_expressive_narrator ";
+        voice_id = "English_magnetic_voiced_man";
       }
     }
     log.info("input:{},{},{}", input, provider, voice_id);
@@ -108,9 +109,9 @@ public class ManimTTSService {
     } else if (TTSPlatform.minimax.equals(provider)) {
       MiniMaxTTSResponse speech = MiniMaxHttpClient.speech(input, voice_id);
       String audio = speech.getData().getAudio();
-      
+
       byte[] decodeToBytes;
-      
+
       try {
         decodeToBytes = Hex.decodeHex(audio);
         FileUtil.writeBytes(decodeToBytes, audioFile);
