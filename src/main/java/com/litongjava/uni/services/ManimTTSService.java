@@ -6,9 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.binary.Hex;
-
 import com.litongjava.fishaudio.tts.FishAudioClient;
 import com.litongjava.fishaudio.tts.FishAudioTTSRequestVo;
 import com.litongjava.minimax.MiniMaxHttpClient;
@@ -17,6 +14,7 @@ import com.litongjava.minimax.MiniMaxVoice;
 import com.litongjava.model.http.response.ResponseVo;
 import com.litongjava.openai.tts.OpenAiTTSClient;
 import com.litongjava.tio.utils.crypto.Md5Utils;
+import com.litongjava.tio.utils.hex.HexUtils;
 import com.litongjava.tio.utils.hutool.FileUtil;
 import com.litongjava.tio.utils.hutool.StrUtil;
 import com.litongjava.tio.utils.lang.ChineseUtils;
@@ -80,12 +78,7 @@ public class ManimTTSService {
       case "minimax":
         MiniMaxTTSResponse minimaxResp = MiniMaxHttpClient.speech(input, voiceId);
         String audioHex = minimaxResp.getData().getAudio();
-        try {
-          audioBytes = Hex.decodeHex(audioHex);
-        } catch (DecoderException e) {
-          log.error("Failed to decode Minimax audio for voice '{}'", voiceId, e);
-          return FileUtil.readBytes(new File("default.mp3"));
-        }
+        audioBytes = HexUtils.decodeHex(audioHex);
         break;
 
       default:  // fallback to OpenAI
