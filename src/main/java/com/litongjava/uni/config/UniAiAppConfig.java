@@ -10,7 +10,7 @@ import com.litongjava.uni.handler.ManimTTSHandler;
 public class UniAiAppConfig {
 
   public void config() {
-    new File("cache").mkdirs();
+    new File("cache/audio").mkdirs();
     DbTables.init();
     // 获取 HTTP 请求路由器
     TioBootServer server = TioBootServer.me();

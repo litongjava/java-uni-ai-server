@@ -38,6 +38,12 @@
       <scope>provided</scope>
     </dependency>
 
+    <dependency>
+      <groupId>com.litongjava</groupId>
+      <artifactId>java-native-media</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+
     <!-- sqlite-jdbc -->
     <dependency>
       <groupId>org.xerial</groupId>

@@ -6,4 +6,5 @@ public interface TTSPlatform {
   String openai = "openai";
   String fishaudio = "fishaudio";
   String minimax = "minimax";
+  String kokoroEn = "kokoro_en";
 }

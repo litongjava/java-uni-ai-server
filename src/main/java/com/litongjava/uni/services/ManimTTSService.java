@@ -6,10 +6,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import com.k2fsa.sherpa.onnx.GeneratedAudio;
 import com.litongjava.db.activerecord.Db;
 import com.litongjava.db.activerecord.Row;
 import com.litongjava.fishaudio.tts.FishAudioClient;
 import com.litongjava.fishaudio.tts.FishAudioTTSRequestVo;
+import com.litongjava.media.NativeMedia;
 import com.litongjava.minimax.MiniMaxHttpClient;
 import com.litongjava.minimax.MiniMaxTTSResponse;
 import com.litongjava.minimax.MiniMaxVoice;
@@ -23,6 +25,7 @@ import com.litongjava.tio.utils.lang.ChineseUtils;
 import com.litongjava.tio.utils.snowflake.SnowflakeIdUtils;
 import com.litongjava.uni.consts.TTSPlatform;
 import com.litongjava.uni.consts.UniTableName;
+import com.litongjava.uni.tts.PooledNonStreamingTtsKokoroEn;
 import com.litongjava.volcengine.VolceTtsClient;
 
 import lombok.extern.slf4j.Slf4j;
@@ -31,27 +34,32 @@ import lombok.extern.slf4j.Slf4j;
 public class ManimTTSService {
 
   public byte[] tts(String input, String provider, String voice_id) {
-    // 1. 根据输入文本内容判断默认 provider 和 voice_id
-    if (ChineseUtils.containsChinese(input)) {
-      if (StrUtil.isBlank(provider)) {
-        provider = "minimax";
-      }
-      if (StrUtil.isBlank(voice_id)) {
-        voice_id = MiniMaxVoice.Chinese_Mandarin_Gentleman;
-      }
-    } else {
-      if (StrUtil.isBlank(provider)) {
-        provider = "minimax";
-      }
-      if (StrUtil.isBlank(voice_id)) {
-        voice_id = "English_magnetic_voiced_man";
+
+    if (StrUtil.isEmpty(provider)) {
+      // 1. 根据输入文本内容判断默认 provider 和 voice_id
+      if (ChineseUtils.containsChinese(input)) {
+        if (StrUtil.isBlank(provider)) {
+          provider = "minimax";
+        }
+        if (StrUtil.isBlank(voice_id)) {
+          voice_id = MiniMaxVoice.Chinese_Mandarin_Gentleman;
+        }
+      } else {
+        if (StrUtil.isBlank(provider)) {
+          provider = "minimax";
+        }
+        if (StrUtil.isBlank(voice_id)) {
+          voice_id = "English_magnetic_voiced_man";
+        }
       }
     }
+
     log.info("input: {}, provider: {}, voice_id: {}", input, provider, voice_id);
 
     // 2. 计算 MD5，并从数据库缓存表里查询是否已有生成记录
     String md5 = Md5Utils.md5Hex(input);
-    String sql = String.format("SELECT id, path FROM %s WHERE md5 = ? AND provider = ? AND voice = ?", UniTableName.UNI_TTS_CACHE);
+    String sql = String.format("SELECT id, path FROM %s WHERE md5 = ? AND provider = ? AND voice = ?",
+        UniTableName.UNI_TTS_CACHE);
     Row row = Db.findFirst(sql, md5, provider, voice_id);
 
     // 3. 如果查到了缓存记录，就尝试读取文件
@@ -63,19 +71,17 @@ public class ManimTTSService {
         // 命中缓存且成功读取
         return cached;
       }
-      // 如果文件不存在或读取出错，readCachedTts 方法内部会删除这条缓存记录，下面继续走 TTS 生成流程
     }
 
     // 4. 如果缓存无效或不存在，就生成新的音频并写入缓存
     long newId = SnowflakeIdUtils.id();
-    String cacheAudioDir = "cache/audio";
+    String cacheAudioDir = "cache" + File.separator + "audio";
     new File(cacheAudioDir).mkdirs();
-    String newPath = cacheAudioDir + File.separator + newId + ".mp3";
-    byte[] bodyBytes;
-
+    String cacheFilePath = cacheAudioDir + File.separator + newId + ".mp3";
+    File audioFile = new File(cacheFilePath);
+    byte[] bodyBytes = null;
     if (TTSPlatform.volce.equals(provider)) {
       bodyBytes = VolceTtsClient.tts(input);
-
     } else if (TTSPlatform.fishaudio.equals(provider)) {
       FishAudioTTSRequestVo vo = new FishAudioTTSRequestVo();
       vo.setText(input);
@@ -93,6 +99,17 @@ public class ManimTTSService {
       String audioHex = speech.getData().getAudio();
       bodyBytes = HexUtils.decodeHex(audioHex);
 
+    } else if (TTSPlatform.kokoroEn.equals(provider)) {
+      try {
+        GeneratedAudio synthesize = PooledNonStreamingTtsKokoroEn.synthesize(input, 3, 1.0f);
+        String wavCacheFilePath = cacheAudioDir + File.separator + newId + ".wav";
+        synthesize.save(wavCacheFilePath);
+        NativeMedia.toMp3(wavCacheFilePath);
+        new File(wavCacheFilePath).delete();
+        bodyBytes = FileUtil.readBytes(audioFile);
+      } catch (InterruptedException e) {
+        bodyBytes = FileUtil.readBytes(new File("default.mp3"));
+      }
     } else {
       ResponseVo responseVo = OpenAiTTSClient.speech(input);
       if (responseVo.isOk()) {
@@ -104,10 +121,12 @@ public class ManimTTSService {
     }
 
     // 5. 将新生成的音频写到本地，并存一条缓存记录
-    File audioFile = new File(newPath);
-    FileUtil.writeBytes(bodyBytes, audioFile);
+    if (!audioFile.exists()) {
+      FileUtil.writeBytes(bodyBytes, audioFile);
+    }
 
-    Row saveRow = Row.by("id", newId).set("input", input).set("md5", md5).set("path", newPath).set("provider", provider).set("voice", voice_id);
+    Row saveRow = Row.by("id", newId).set("input", input).set("md5", md5).set("path", cacheFilePath)
+        .set("provider", provider).set("voice", voice_id);
     Db.save(UniTableName.UNI_TTS_CACHE, saveRow);
 
     return bodyBytes;
