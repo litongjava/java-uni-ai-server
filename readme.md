@@ -2,6 +2,31 @@
 
 java-uni-ai-server，旨在帮助开发者快速集成和使用各种第三方接口。
 
+## 整合到其他tio-boot项目中
+build
+
+```
+set JAVA_HOME=D:\java\jdk-1.8_411
+mvn clean install -DskipTests
+```
+
+add maven dependency
+
+```xml
+    <dependency>
+      <groupId>com.litongjava</groupId>
+      <artifactId>java-uni-ai-server</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+```
+
+config
+
+```java
+import com.litongjava.uni.config.UniAiAppConfig;
+
+new UniAiAppConfig().config();
+```
 ---
 ## TTS 
 # ## 1. 接口概述
