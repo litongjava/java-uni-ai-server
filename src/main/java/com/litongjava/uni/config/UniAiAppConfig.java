@@ -19,6 +19,7 @@ public class UniAiAppConfig {
     if (r != null) {
       ManimTTSHandler manimTTSHandler = Aop.get(ManimTTSHandler.class);
       r.add("/api/manim/tts", manimTTSHandler::index);
+      r.add("/tts", manimTTSHandler::index);
     }
   }
 }
