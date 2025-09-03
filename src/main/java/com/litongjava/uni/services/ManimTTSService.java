@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import com.k2fsa.sherpa.onnx.GeneratedAudio;
+import com.litongjava.consts.UniTableName;
 import com.litongjava.db.activerecord.Db;
 import com.litongjava.db.activerecord.Row;
 import com.litongjava.fishaudio.tts.FishAudioClient;
@@ -23,8 +24,8 @@ import com.litongjava.tio.utils.hutool.FileUtil;
 import com.litongjava.tio.utils.hutool.StrUtil;
 import com.litongjava.tio.utils.lang.ChineseUtils;
 import com.litongjava.tio.utils.snowflake.SnowflakeIdUtils;
-import com.litongjava.uni.consts.TTSPlatform;
-import com.litongjava.uni.consts.UniTableName;
+import com.litongjava.tts.TTSPlatform;
+import com.litongjava.uni.consts.UniConsts;
 import com.litongjava.uni.tts.PooledNonStreamingTtsKokoroEn;
 import com.litongjava.volcengine.VolceTtsClient;
 
@@ -75,8 +76,12 @@ public class ManimTTSService {
 
     // 4. 如果缓存无效或不存在，就生成新的音频并写入缓存
     long newId = SnowflakeIdUtils.id();
-    String cacheAudioDir = "cache" + File.separator + "audio";
-    new File(cacheAudioDir).mkdirs();
+    String cacheAudioDir = UniConsts.DATA_DIR + File.separator + "audio";
+    File audioDir = new File(cacheAudioDir);
+    if (!audioDir.exists()) {
+      audioDir.mkdirs();
+    }
+
     String cacheFilePath = cacheAudioDir + File.separator + newId + ".mp3";
     File audioFile = new File(cacheFilePath);
     byte[] bodyBytes = null;
