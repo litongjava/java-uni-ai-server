@@ -5,7 +5,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.locks.Lock;
 
+import com.google.common.util.concurrent.Striped;
 import com.k2fsa.sherpa.onnx.GeneratedAudio;
 import com.litongjava.consts.UniTableName;
 import com.litongjava.db.activerecord.Db;
@@ -33,6 +35,8 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class UniTTSService {
+
+  private static final Striped<Lock> stripedLocks = Striped.lock(1024);
 
   public byte[] tts(String input, String provider, String voice_id) {
 
@@ -74,15 +78,27 @@ public class UniTTSService {
       }
     }
 
-    // 4. 如果缓存无效或不存在，就生成新的音频并写入缓存
-    long newId = SnowflakeIdUtils.id();
-    String cacheAudioDir = UniConsts.DATA_DIR + File.separator + "audio";
-    File audioDir = new File(cacheAudioDir);
-    if (!audioDir.exists()) {
-      audioDir.mkdirs();
+    Lock lock = stripedLocks.get(md5);
+    lock.lock();
+    try {
+      // 4. 如果缓存无效或不存在，就生成新的音频并写入缓存
+
+      String cacheAudioDir = UniConsts.DATA_DIR + File.separator + "audio";
+      File audioDir = new File(cacheAudioDir);
+      if (!audioDir.exists()) {
+        audioDir.mkdirs();
+      }
+      byte[] bodyBytes = synthesis(input, provider, voice_id, md5, cacheAudioDir);
+      return bodyBytes;
+    } finally {
+      lock.unlock();
     }
 
-    String cacheFilePath = cacheAudioDir + File.separator + newId + ".mp3";
+  }
+
+  private byte[] synthesis(String input, String provider, String voice_id, String md5, String cacheAudioDir) {
+    long id = SnowflakeIdUtils.id();
+    String cacheFilePath = cacheAudioDir + File.separator + id + ".mp3";
     File audioFile = new File(cacheFilePath);
     byte[] bodyBytes = null;
     if (TTSPlatform.volce.equals(provider)) {
@@ -107,7 +123,7 @@ public class UniTTSService {
     } else if (TTSPlatform.kokoroEn.equals(provider)) {
       try {
         GeneratedAudio synthesize = PooledNonStreamingTtsKokoroEn.synthesize(input, 3, 1.0f);
-        String wavCacheFilePath = cacheAudioDir + File.separator + newId + ".wav";
+        String wavCacheFilePath = cacheAudioDir + File.separator + id + ".wav";
         synthesize.save(wavCacheFilePath);
         NativeMedia.toMp3(wavCacheFilePath);
         new File(wavCacheFilePath).delete();
@@ -130,9 +146,13 @@ public class UniTTSService {
       FileUtil.writeBytes(bodyBytes, audioFile);
     }
 
-    Row saveRow = Row.by("id", newId).set("input", input).set("md5", md5).set("path", cacheFilePath)
+    Row saveRow = Row.by("id", id).set("input", input).set("md5", md5).set("path", cacheFilePath)
         .set("provider", provider).set("voice", voice_id);
-    Db.save(UniTableName.UNI_TTS_CACHE, saveRow);
+    try {
+      Db.save(UniTableName.UNI_TTS_CACHE, saveRow);
+    } catch (Exception e) {
+      log.error(e.getMessage(), e);
+    }
 
     return bodyBytes;
   }
