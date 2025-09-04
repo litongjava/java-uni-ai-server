@@ -5,10 +5,10 @@ import com.litongjava.tio.boot.http.TioRequestContext;
 import com.litongjava.tio.http.common.HttpRequest;
 import com.litongjava.tio.http.common.HttpResponse;
 import com.litongjava.tio.http.server.util.Resps;
-import com.litongjava.uni.services.ManimTTSService;
+import com.litongjava.uni.services.UniTTSService;
 
 public class ManimTTSHandler {
-  ManimTTSService manimTTSService = Aop.get(ManimTTSService.class);
+  UniTTSService manimTTSService = Aop.get(UniTTSService.class);
 
   public HttpResponse index(HttpRequest request) {
     HttpResponse response = TioRequestContext.getResponse();

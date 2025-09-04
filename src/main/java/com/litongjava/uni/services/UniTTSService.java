@@ -32,7 +32,7 @@ import com.litongjava.volcengine.VolceTtsClient;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class ManimTTSService {
+public class UniTTSService {
 
   public byte[] tts(String input, String provider, String voice_id) {
 
