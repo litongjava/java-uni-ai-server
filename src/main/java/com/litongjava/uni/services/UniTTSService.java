@@ -120,7 +120,7 @@ public class UniTTSService {
       String audioHex = speech.getData().getAudio();
       bodyBytes = HexUtils.decodeHex(audioHex);
 
-    } else if (TTSPlatform.kokoroEn.equals(provider)) {
+    } else if (TTSPlatform.local_kokoro_en.equals(provider)) {
       try {
         GeneratedAudio synthesize = PooledNonStreamingTtsKokoroEn.synthesize(input, 3, 1.0f);
         String wavCacheFilePath = cacheAudioDir + File.separator + id + ".wav";
