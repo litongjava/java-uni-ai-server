@@ -27,6 +27,7 @@ import com.litongjava.tio.utils.hutool.StrUtil;
 import com.litongjava.tio.utils.lang.ChineseUtils;
 import com.litongjava.tio.utils.snowflake.SnowflakeIdUtils;
 import com.litongjava.tts.TTSPlatform;
+import com.litongjava.uni.consts.ResourcesContainer;
 import com.litongjava.uni.consts.UniConsts;
 import com.litongjava.uni.model.UniTTSResult;
 import com.litongjava.uni.tts.PooledNonStreamingTtsKokoroEn;
@@ -105,7 +106,7 @@ public class UniTTSService {
       bodyBytes = VolceTtsClient.tts(input);
 
     } else {
-      byte[] default_mp3_bytes = FileUtil.readBytes(new File("default.mp3"));
+
       if (TTSPlatform.fishaudio.equals(provider)) {
         FishAudioTTSRequestVo vo = new FishAudioTTSRequestVo();
         vo.setText(input);
@@ -115,7 +116,7 @@ public class UniTTSService {
           bodyBytes = responseVo.getBodyBytes();
         } else {
           log.error("FishAudio TTS error: {}", responseVo.getBodyString());
-          return new UniTTSResult(null, default_mp3_bytes);
+          return new UniTTSResult(null, ResourcesContainer.default_mp3_bytes);
         }
 
       } else if (TTSPlatform.minimax.equals(provider)) {
@@ -132,7 +133,7 @@ public class UniTTSService {
           new File(wavCacheFilePath).delete();
           bodyBytes = FileUtil.readBytes(audioFile);
         } catch (InterruptedException e) {
-          bodyBytes = default_mp3_bytes;
+          bodyBytes = ResourcesContainer.default_mp3_bytes;
         }
       } else {
         ResponseVo responseVo = OpenAiTTSClient.speech(input);
@@ -140,7 +141,7 @@ public class UniTTSService {
           bodyBytes = responseVo.getBodyBytes();
         } else {
           log.error("OpenAI TTS error: {}", responseVo.getBodyString());
-          return new UniTTSResult(null, default_mp3_bytes);
+          return new UniTTSResult(null, ResourcesContainer.default_mp3_bytes);
         }
       }
     }
