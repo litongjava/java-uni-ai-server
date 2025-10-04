@@ -3,6 +3,7 @@ package com.litongjava.uni.config;
 import java.net.URL;
 import java.util.List;
 
+import com.litongjava.consts.UniTableName;
 import com.litongjava.db.activerecord.Db;
 import com.litongjava.tio.utils.hutool.FileUtil;
 import com.litongjava.tio.utils.hutool.ResourceUtil;
@@ -13,11 +14,15 @@ import lombok.extern.slf4j.Slf4j;
 public class DbTables {
 
   public static void init() {
-    String userTableName = "uni_tts_cache";
 
-    boolean created = createTable(userTableName);
+    boolean created = createTable(UniTableName.UNI_TTS_CACHE);
     if (created) {
-      log.info("created table:{}", userTableName);
+      log.info("created table:{}", UniTableName.UNI_TTS_CACHE);
+    }
+
+    created = createTable(UniTableName.UNI_ASR_CACHE);
+    if (created) {
+      log.info("created table:{}", UniTableName.UNI_ASR_CACHE);
     }
 
   }

@@ -158,3 +158,4 @@ app.zip
 cache/
 java-uni-ai-server.db
 sherpa-onnx-jni.dll
+data/
