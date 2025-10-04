@@ -2,6 +2,7 @@ CREATE TABLE uni_asr_cache (
   id BIGINT NOT NULL PRIMARY KEY,
   md5 varchar,
   path varchar,
+  format varchar,
   text varchar,
   creator VARCHAR(64) DEFAULT '',
   create_time TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,

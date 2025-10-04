@@ -57,8 +57,8 @@ public class UniSubtitleService {
       }
     }
 
-    String sql = String.format("SELECT id, path,text FROM %s WHERE md5 = ? ", UniTableName.UNI_ASR_CACHE);
-    Row row = Db.findFirst(sql, md5);
+    String sql = String.format("SELECT id, path,text FROM %s WHERE md5 = ? and format=?", UniTableName.UNI_ASR_CACHE);
+    Row row = Db.findFirst(sql, md5, response_format);
 
     // 3. 如果查到了缓存记录，就尝试读取文件
     if (row != null) {
@@ -78,15 +78,16 @@ public class UniSubtitleService {
       }
       ResponseVo responseVo = WhisperClient.transcriptions(file, response_format, prompt);
       bodyString = responseVo.getBodyString();
-      
+
       long id = SnowflakeIdUtils.id();
-      Row saveRow = Row.by("id", id).set("text", bodyString).set("md5", md5).set("path", path);
+      Row saveRow = Row.by("id", id).set("text", bodyString).set("md5", md5).set("path", path).set("format",
+          response_format);
       try {
         Db.save(UniTableName.UNI_ASR_CACHE, saveRow);
       } catch (Exception e) {
         log.error(e.getMessage(), e);
       }
-      
+
     } finally {
       lock.unlock();
     }
