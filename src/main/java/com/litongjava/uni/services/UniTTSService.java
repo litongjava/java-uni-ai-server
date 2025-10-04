@@ -28,6 +28,7 @@ import com.litongjava.tio.utils.lang.ChineseUtils;
 import com.litongjava.tio.utils.snowflake.SnowflakeIdUtils;
 import com.litongjava.tts.TTSPlatform;
 import com.litongjava.uni.consts.UniConsts;
+import com.litongjava.uni.model.UniTTSResult;
 import com.litongjava.uni.tts.PooledNonStreamingTtsKokoroEn;
 import com.litongjava.volcengine.VolceTtsClient;
 
@@ -38,7 +39,7 @@ public class UniTTSService {
 
   private static final Striped<Lock> stripedLocks = Striped.lock(1024);
 
-  public byte[] tts(String input, String provider, String voice_id) {
+  public UniTTSResult tts(String input, String provider, String voice_id) {
 
     if (StrUtil.isEmpty(provider)) {
       // 1. 根据输入文本内容判断默认 provider 和 voice_id
@@ -74,7 +75,7 @@ public class UniTTSService {
       byte[] cached = readCachedTts(path, cacheId);
       if (cached != null) {
         // 命中缓存且成功读取
-        return cached;
+        return new UniTTSResult(path, cached);
       }
     }
 
@@ -88,56 +89,59 @@ public class UniTTSService {
       if (!audioDir.exists()) {
         audioDir.mkdirs();
       }
-      byte[] bodyBytes = synthesis(input, provider, voice_id, md5, cacheAudioDir);
-      return bodyBytes;
+      return synthesis(input, provider, voice_id, md5, cacheAudioDir);
     } finally {
       lock.unlock();
     }
 
   }
 
-  private byte[] synthesis(String input, String provider, String voice_id, String md5, String cacheAudioDir) {
+  private UniTTSResult synthesis(String input, String provider, String voice_id, String md5, String cacheAudioDir) {
     long id = SnowflakeIdUtils.id();
     String cacheFilePath = cacheAudioDir + File.separator + id + ".mp3";
     File audioFile = new File(cacheFilePath);
     byte[] bodyBytes = null;
     if (TTSPlatform.volce.equals(provider)) {
       bodyBytes = VolceTtsClient.tts(input);
-    } else if (TTSPlatform.fishaudio.equals(provider)) {
-      FishAudioTTSRequestVo vo = new FishAudioTTSRequestVo();
-      vo.setText(input);
-      vo.setReference_id(voice_id);
-      ResponseVo responseVo = FishAudioClient.speech(vo);
-      if (responseVo.isOk()) {
-        bodyBytes = responseVo.getBodyBytes();
-      } else {
-        log.error("FishAudio TTS error: {}", responseVo.getBodyString());
-        return FileUtil.readBytes(new File("default.mp3"));
-      }
 
-    } else if (TTSPlatform.minimax.equals(provider)) {
-      MiniMaxTTSResponse speech = MiniMaxHttpClient.speech(input, voice_id);
-      String audioHex = speech.getData().getAudio();
-      bodyBytes = HexUtils.decodeHex(audioHex);
-
-    } else if (TTSPlatform.local_kokoro_en.equals(provider)) {
-      try {
-        GeneratedAudio synthesize = PooledNonStreamingTtsKokoroEn.synthesize(input, 3, 1.0f);
-        String wavCacheFilePath = cacheAudioDir + File.separator + id + ".wav";
-        synthesize.save(wavCacheFilePath);
-        NativeMedia.toMp3(wavCacheFilePath);
-        new File(wavCacheFilePath).delete();
-        bodyBytes = FileUtil.readBytes(audioFile);
-      } catch (InterruptedException e) {
-        bodyBytes = FileUtil.readBytes(new File("default.mp3"));
-      }
     } else {
-      ResponseVo responseVo = OpenAiTTSClient.speech(input);
-      if (responseVo.isOk()) {
-        bodyBytes = responseVo.getBodyBytes();
+      byte[] default_mp3_bytes = FileUtil.readBytes(new File("default.mp3"));
+      if (TTSPlatform.fishaudio.equals(provider)) {
+        FishAudioTTSRequestVo vo = new FishAudioTTSRequestVo();
+        vo.setText(input);
+        vo.setReference_id(voice_id);
+        ResponseVo responseVo = FishAudioClient.speech(vo);
+        if (responseVo.isOk()) {
+          bodyBytes = responseVo.getBodyBytes();
+        } else {
+          log.error("FishAudio TTS error: {}", responseVo.getBodyString());
+          return new UniTTSResult(null, default_mp3_bytes);
+        }
+
+      } else if (TTSPlatform.minimax.equals(provider)) {
+        MiniMaxTTSResponse speech = MiniMaxHttpClient.speech(input, voice_id);
+        String audioHex = speech.getData().getAudio();
+        bodyBytes = HexUtils.decodeHex(audioHex);
+
+      } else if (TTSPlatform.local_kokoro_en.equals(provider)) {
+        try {
+          GeneratedAudio synthesize = PooledNonStreamingTtsKokoroEn.synthesize(input, 3, 1.0f);
+          String wavCacheFilePath = cacheAudioDir + File.separator + id + ".wav";
+          synthesize.save(wavCacheFilePath);
+          NativeMedia.toMp3(wavCacheFilePath);
+          new File(wavCacheFilePath).delete();
+          bodyBytes = FileUtil.readBytes(audioFile);
+        } catch (InterruptedException e) {
+          bodyBytes = default_mp3_bytes;
+        }
       } else {
-        log.error("OpenAI TTS error: {}", responseVo.getBodyString());
-        return FileUtil.readBytes(new File("default.mp3"));
+        ResponseVo responseVo = OpenAiTTSClient.speech(input);
+        if (responseVo.isOk()) {
+          bodyBytes = responseVo.getBodyBytes();
+        } else {
+          log.error("OpenAI TTS error: {}", responseVo.getBodyString());
+          return new UniTTSResult(null, default_mp3_bytes);
+        }
       }
     }
 
@@ -154,7 +158,7 @@ public class UniTTSService {
       log.error(e.getMessage(), e);
     }
 
-    return bodyBytes;
+    return new UniTTSResult(cacheFilePath, bodyBytes);
   }
 
   /**

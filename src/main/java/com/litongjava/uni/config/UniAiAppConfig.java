@@ -5,7 +5,7 @@ import java.io.File;
 import com.litongjava.tio.boot.server.TioBootServer;
 import com.litongjava.tio.http.server.router.HttpRequestRouter;
 import com.litongjava.uni.consts.UniConsts;
-import com.litongjava.uni.handler.ManimTTSHandler;
+import com.litongjava.uni.handler.TTSHandler;
 
 public class UniAiAppConfig {
 
@@ -17,9 +17,9 @@ public class UniAiAppConfig {
     HttpRequestRouter r = server.getRequestRouter();
 
     if (r != null) {
-      ManimTTSHandler manimTTSHandler = new ManimTTSHandler();
-      r.add("/api/manim/tts", manimTTSHandler::index);
-      r.add("/tts", manimTTSHandler::index);
+      TTSHandler manimTTSHandler = new TTSHandler();
+      r.add("/api/manim/tts", manimTTSHandler);
+      r.add("/tts", manimTTSHandler);
     }
   }
 }
