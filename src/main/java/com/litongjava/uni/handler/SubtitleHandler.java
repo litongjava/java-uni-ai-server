@@ -17,7 +17,13 @@ public class SubtitleHandler implements HttpRequestHandler {
   public HttpResponse handle(HttpRequest httpRequest) throws Exception {
     UploadFile uploadFile = httpRequest.getUploadFile("file");
     String prompt = httpRequest.getParam("prompt");
+    if (prompt != null) {
+      prompt = "The text of audio is:" + prompt;
+    }
     String response_format = httpRequest.getParam("response_format");
+    if (response_format == null) {
+      response_format = "vtt";
+    }
     String path = httpRequest.getParam("path");
     RespBodyVo index = subtitleService.index(uploadFile, prompt, response_format, path);
     HttpResponse response = TioRequestContext.getResponse();
