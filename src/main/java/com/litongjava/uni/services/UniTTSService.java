@@ -1,7 +1,6 @@
 package com.litongjava.uni.services;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -73,7 +72,7 @@ public class UniTTSService {
     if (row != null) {
       long cacheId = row.getLong("id");
       String path = row.getStr("path");
-      byte[] cached = readCachedTts(path, cacheId);
+      File cached = validCachedTts(path, cacheId);
       if (cached != null) {
         // 命中缓存且成功读取
         return new UniTTSResult(path, cached);
@@ -101,48 +100,46 @@ public class UniTTSService {
     long id = SnowflakeIdUtils.id();
     String cacheFilePath = cacheAudioDir + File.separator + id + ".mp3";
     File audioFile = new File(cacheFilePath);
+
     byte[] bodyBytes = null;
     if (TTSPlatform.volce.equals(provider)) {
       bodyBytes = VolceTtsClient.tts(input);
 
-    } else {
-
-      if (TTSPlatform.fishaudio.equals(provider)) {
-        FishAudioTTSRequestVo vo = new FishAudioTTSRequestVo();
-        vo.setText(input);
-        vo.setReference_id(voice_id);
-        ResponseVo responseVo = FishAudioClient.speech(vo);
-        if (responseVo.isOk()) {
-          bodyBytes = responseVo.getBodyBytes();
-        } else {
-          log.error("FishAudio TTS error: {}", responseVo.getBodyString());
-          return new UniTTSResult(null, ResourcesContainer.default_mp3_bytes);
-        }
-
-      } else if (TTSPlatform.minimax.equals(provider)) {
-        MiniMaxTTSResponse speech = MiniMaxHttpClient.speech(input, voice_id);
-        String audioHex = speech.getData().getAudio();
-        bodyBytes = HexUtils.decodeHex(audioHex);
-
-      } else if (TTSPlatform.local_kokoro_en.equals(provider)) {
-        try {
-          GeneratedAudio synthesize = PooledNonStreamingTtsKokoroEn.synthesize(input, 3, 1.0f);
-          String wavCacheFilePath = cacheAudioDir + File.separator + id + ".wav";
-          synthesize.save(wavCacheFilePath);
-          NativeMedia.toMp3(wavCacheFilePath);
-          new File(wavCacheFilePath).delete();
-          bodyBytes = FileUtil.readBytes(audioFile);
-        } catch (InterruptedException e) {
-          bodyBytes = ResourcesContainer.default_mp3_bytes;
-        }
+    } else if (TTSPlatform.fishaudio.equals(provider)) {
+      FishAudioTTSRequestVo vo = new FishAudioTTSRequestVo();
+      vo.setText(input);
+      vo.setReference_id(voice_id);
+      ResponseVo responseVo = FishAudioClient.speech(vo);
+      if (responseVo.isOk()) {
+        bodyBytes = responseVo.getBodyBytes();
       } else {
-        ResponseVo responseVo = OpenAiTTSClient.speech(input);
-        if (responseVo.isOk()) {
-          bodyBytes = responseVo.getBodyBytes();
-        } else {
-          log.error("OpenAI TTS error: {}", responseVo.getBodyString());
-          return new UniTTSResult(null, ResourcesContainer.default_mp3_bytes);
-        }
+        log.error("FishAudio TTS error: {}", responseVo.getBodyString());
+        return new UniTTSResult(null, ResourcesContainer.default_mp3_bytes);
+      }
+
+    } else if (TTSPlatform.minimax.equals(provider)) {
+      MiniMaxTTSResponse speech = MiniMaxHttpClient.speech(input, voice_id);
+      String audioHex = speech.getData().getAudio();
+      bodyBytes = HexUtils.decodeHex(audioHex);
+
+    } else if (TTSPlatform.local_kokoro_en.equals(provider)) {
+      try {
+        GeneratedAudio synthesize = PooledNonStreamingTtsKokoroEn.synthesize(input, 3, 1.0f);
+        String wavCacheFilePath = cacheAudioDir + File.separator + id + ".wav";
+        synthesize.save(wavCacheFilePath);
+        NativeMedia.toMp3(wavCacheFilePath);
+        new File(wavCacheFilePath).delete();
+        bodyBytes = FileUtil.readBytes(audioFile);
+      } catch (InterruptedException e) {
+        return new UniTTSResult(null, ResourcesContainer.default_mp3_bytes);
+      }
+    } else {
+      ResponseVo responseVo = OpenAiTTSClient.speech(input);
+      if (responseVo.isOk()) {
+        bodyBytes = responseVo.getBodyBytes();
+      } else {
+        log.error("OpenAI TTS error: {}", responseVo.getBodyString());
+        return new UniTTSResult(null, ResourcesContainer.default_mp3_bytes);
       }
     }
 
@@ -159,28 +156,20 @@ public class UniTTSService {
       log.error(e.getMessage(), e);
     }
 
-    return new UniTTSResult(cacheFilePath, bodyBytes);
+    return new UniTTSResult(cacheFilePath, audioFile);
   }
 
   /**
    * 如果 path 有效且文件存在，就尝试读取并返回字节数组；否则删除对应的缓存记录并返回 null。
    */
-  private byte[] readCachedTts(String path, long cacheId) {
+  private File validCachedTts(String path, long cacheId) {
     if (StrUtil.isBlank(path)) {
       return null;
     }
     Path filePath = Paths.get(path);
     if (Files.exists(filePath)) {
       log.info("Reading cached TTS file at [{}]", path);
-      try {
-        return Files.readAllBytes(filePath);
-      } catch (IOException e) {
-        log.error("Failed to read cached TTS file [{}], will delete cache record id={}", path, cacheId, e);
-        // 如果读取出错，就删除数据库中对应的缓存记录
-        String deleteSql = String.format("DELETE FROM %s WHERE id = ?", UniTableName.UNI_TTS_CACHE);
-        Db.delete(deleteSql, cacheId);
-        return null;
-      }
+      return filePath.toFile();
     } else {
       // 文件实际不存在，直接删除数据库中的缓存记录
       log.warn("Cached file not found at [{}], deleting cache record id={}", path, cacheId);
