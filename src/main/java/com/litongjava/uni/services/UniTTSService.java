@@ -17,13 +17,14 @@ import com.litongjava.media.NativeMedia;
 import com.litongjava.minimax.MiniMaxHttpClient;
 import com.litongjava.minimax.MiniMaxTTSResponse;
 import com.litongjava.minimax.MiniMaxVoice;
+import com.litongjava.minimax.MinimaxLanguageBoost;
 import com.litongjava.model.http.response.ResponseVo;
 import com.litongjava.openai.tts.OpenAiTTSClient;
 import com.litongjava.tio.utils.crypto.Md5Utils;
 import com.litongjava.tio.utils.hex.HexUtils;
 import com.litongjava.tio.utils.hutool.FileUtil;
 import com.litongjava.tio.utils.hutool.StrUtil;
-import com.litongjava.tio.utils.lang.ChineseUtils;
+import com.litongjava.tio.utils.lang.ChineseDetector;
 import com.litongjava.tio.utils.snowflake.SnowflakeIdUtils;
 import com.litongjava.tts.TTSPlatform;
 import com.litongjava.uni.consts.ResourcesContainer;
@@ -41,13 +42,17 @@ public class UniTTSService {
 
   public UniTTSResult tts(String input, String provider, String voice_id) {
 
+    // 必须设置,否则cosine会读成希腊语
+    String language_boost = "auto";
     if (StrUtil.isEmpty(provider)) {
       // 1. 根据输入文本内容判断默认 provider 和 voice_id
-      if (ChineseUtils.containsChinese(input)) {
+
+      if (ChineseDetector.isChinese(input)) {
         if (StrUtil.isBlank(provider)) {
           provider = "minimax";
         }
         if (StrUtil.isBlank(voice_id)) {
+          language_boost = MinimaxLanguageBoost.CHINESE.getCode();
           voice_id = MiniMaxVoice.Chinese_Mandarin_Gentleman;
         }
       } else {
@@ -55,7 +60,8 @@ public class UniTTSService {
           provider = "minimax";
         }
         if (StrUtil.isBlank(voice_id)) {
-          voice_id = "English_magnetic_voiced_man";
+          voice_id = MiniMaxVoice.English_magnetic_voiced_man;
+          language_boost = MinimaxLanguageBoost.ENGLISH.getCode();
         }
       }
     }
@@ -89,14 +95,16 @@ public class UniTTSService {
       if (!audioDir.exists()) {
         audioDir.mkdirs();
       }
-      return synthesis(input, provider, voice_id, md5, cacheAudioDir);
+      return synthesis(input, provider, voice_id, language_boost, md5, cacheAudioDir);
     } finally {
       lock.unlock();
     }
 
   }
 
-  private UniTTSResult synthesis(String input, String provider, String voice_id, String md5, String cacheAudioDir) {
+  private UniTTSResult synthesis(String input, String provider, String voice_id, String language_boost,
+      //
+      String md5, String cacheAudioDir) {
     long id = SnowflakeIdUtils.id();
     String cacheFilePath = cacheAudioDir + File.separator + id + ".mp3";
     File audioFile = new File(cacheFilePath);
@@ -118,7 +126,7 @@ public class UniTTSService {
       }
 
     } else if (TTSPlatform.minimax.equals(provider)) {
-      MiniMaxTTSResponse speech = MiniMaxHttpClient.speech(input, voice_id);
+      MiniMaxTTSResponse speech = MiniMaxHttpClient.speech(input, voice_id, language_boost);
       String audioHex = speech.getData().getAudio();
       bodyBytes = HexUtils.decodeHex(audioHex);
 
