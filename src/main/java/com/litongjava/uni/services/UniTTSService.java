@@ -1,6 +1,7 @@
 package com.litongjava.uni.services;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -8,6 +9,8 @@ import java.util.concurrent.locks.Lock;
 
 import com.google.common.util.concurrent.Striped;
 import com.k2fsa.sherpa.onnx.GeneratedAudio;
+import com.litongjava.byteplus.BytePlusTTSAudio;
+import com.litongjava.byteplus.BytePlusTTSHttpStreamClient;
 import com.litongjava.consts.UniTableName;
 import com.litongjava.db.activerecord.Db;
 import com.litongjava.db.activerecord.Row;
@@ -16,15 +19,12 @@ import com.litongjava.fishaudio.tts.FishAudioTTSRequestVo;
 import com.litongjava.media.NativeMedia;
 import com.litongjava.minimax.MiniMaxHttpClient;
 import com.litongjava.minimax.MiniMaxTTSResponse;
-import com.litongjava.minimax.MiniMaxVoice;
-import com.litongjava.minimax.MinimaxLanguageBoost;
 import com.litongjava.model.http.response.ResponseVo;
 import com.litongjava.openai.tts.OpenAiTTSClient;
 import com.litongjava.tio.utils.crypto.Md5Utils;
 import com.litongjava.tio.utils.hex.HexUtils;
 import com.litongjava.tio.utils.hutool.FileUtil;
 import com.litongjava.tio.utils.hutool.StrUtil;
-import com.litongjava.tio.utils.lang.ChineseDetector;
 import com.litongjava.tio.utils.snowflake.SnowflakeIdUtils;
 import com.litongjava.tts.TTSPlatform;
 import com.litongjava.uni.consts.ResourcesContainer;
@@ -40,38 +40,13 @@ public class UniTTSService {
 
   private static final Striped<Lock> stripedLocks = Striped.lock(1024);
 
-  public UniTTSResult tts(String input, String provider, String voice_id) {
+  public UniTTSResult tts(String input, String provider, String voice_id, String language_boost) {
 
-    // 必须设置,否则cosine会读成希腊语
-    String language_boost = "auto";
-    if (StrUtil.isEmpty(provider)) {
-      // 1. 根据输入文本内容判断默认 provider 和 voice_id
-
-      if (ChineseDetector.isChinese(input)) {
-        if (StrUtil.isBlank(provider)) {
-          provider = "minimax";
-        }
-        if (StrUtil.isBlank(voice_id)) {
-          language_boost = MinimaxLanguageBoost.CHINESE.getCode();
-          voice_id = MiniMaxVoice.Chinese_Mandarin_Gentleman;
-        }
-      } else {
-        if (StrUtil.isBlank(provider)) {
-          provider = "minimax";
-        }
-        if (StrUtil.isBlank(voice_id)) {
-          voice_id = MiniMaxVoice.English_magnetic_voiced_man;
-          language_boost = MinimaxLanguageBoost.ENGLISH.getCode();
-        }
-      }
-    }
-
-    log.info("input: {}, provider: {}, voice_id: {}", input, provider, voice_id);
+    log.info("input: {}, provider: {}, voice_id: {},language_boost:{}", input, provider, voice_id, language_boost);
 
     // 2. 计算 MD5，并从数据库缓存表里查询是否已有生成记录
     String md5 = Md5Utils.md5Hex(input);
-    String sql = String.format("SELECT id, path FROM %s WHERE md5 = ? AND provider = ? AND voice = ?",
-        UniTableName.UNI_TTS_CACHE);
+    String sql = String.format("SELECT id, path FROM %s WHERE md5 = ? AND provider = ? AND voice = ?", UniTableName.UNI_TTS_CACHE);
     Row row = Db.findFirst(sql, md5, provider, voice_id);
 
     // 3. 如果查到了缓存记录，就尝试读取文件
@@ -130,6 +105,11 @@ public class UniTTSService {
       String audioHex = speech.getData().getAudio();
       bodyBytes = HexUtils.decodeHex(audioHex);
 
+    } else if (TTSPlatform.byteplus.equals(provider)) {
+      BytePlusTTSHttpStreamClient client = new BytePlusTTSHttpStreamClient();
+      BytePlusTTSAudio tts = client.tts(input, voice_id);
+      bodyBytes = tts.getAudioBytes();
+
     } else if (TTSPlatform.local_kokoro_en.equals(provider)) {
       try {
         GeneratedAudio synthesize = PooledNonStreamingTtsKokoroEn.synthesize(input, 3, 1.0f);
@@ -156,8 +136,8 @@ public class UniTTSService {
       FileUtil.writeBytes(bodyBytes, audioFile);
     }
 
-    Row saveRow = Row.by("id", id).set("input", input).set("md5", md5).set("path", cacheFilePath)
-        .set("provider", provider).set("voice", voice_id);
+    Row saveRow = Row.by("id", id).set("input", input).set("md5", md5).set("path", cacheFilePath).set("provider", provider).set("voice",
+        voice_id);
     try {
       Db.save(UniTableName.UNI_TTS_CACHE, saveRow);
     } catch (Exception e) {
@@ -174,16 +154,30 @@ public class UniTTSService {
     if (StrUtil.isBlank(path)) {
       return null;
     }
+    String deleteSql = String.format("DELETE FROM %s WHERE id = ?", UniTableName.UNI_TTS_CACHE);
     Path filePath = Paths.get(path);
     if (Files.exists(filePath)) {
-      log.info("Reading cached TTS file at [{}]", path);
-      return filePath.toFile();
+      long size;
+      try {
+        size = Files.size(filePath);
+        if (size > 0) {
+          log.info("Reading cached TTS file at [{}]", path);
+          return filePath.toFile();
+        } else {
+          Db.delete(deleteSql, cacheId);
+          Files.delete(filePath);
+          return null;
+        }
+      } catch (IOException e) {
+        log.error(e.getMessage(), e);
+      }
+
     } else {
       // 文件实际不存在，直接删除数据库中的缓存记录
       log.warn("Cached file not found at [{}], deleting cache record id={}", path, cacheId);
-      String deleteSql = String.format("DELETE FROM %s WHERE id = ?", UniTableName.UNI_TTS_CACHE);
       Db.delete(deleteSql, cacheId);
       return null;
     }
+    return null;
   }
 }
