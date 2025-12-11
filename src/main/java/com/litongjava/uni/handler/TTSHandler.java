@@ -2,9 +2,8 @@ package com.litongjava.uni.handler;
 
 import java.io.File;
 
+import com.litongjava.fishaudio.tts.FishAudioReference;
 import com.litongjava.jfinal.aop.Aop;
-import com.litongjava.minimax.MiniMaxVoice;
-import com.litongjava.minimax.MinimaxLanguageBoost;
 import com.litongjava.tio.boot.http.TioRequestContext;
 import com.litongjava.tio.boot.utils.HttpFileDataUtils;
 import com.litongjava.tio.http.common.HttpRequest;
@@ -36,29 +35,36 @@ public class TTSHandler implements HttpRequestHandler {
 
       if (ChineseDetector.isChinese(input)) {
         if (StrUtil.isBlank(platform)) {
-          platform = TTSPlatform.minimax;
+          // platform = TTSPlatform.minimax;
+          platform = TTSPlatform.fishaudio;
 
         }
         if (StrUtil.isBlank(voice_id)) {
 //          voice_id = BytePlusVoice.zh_female_cancan_mars_bigtts;
-          voice_id = MiniMaxVoice.Chinese_Mandarin_Gentleman;
-          language_boost = MinimaxLanguageBoost.CHINESE.getCode();
+//          voice_id = MiniMaxVoice.Chinese_Mandarin_Gentleman;
+//          language_boost = MinimaxLanguageBoost.CHINESE.getCode();
+          voice_id = FishAudioReference.Chinese_Lei_Jun;
+
         }
       } else {
         if (StrUtil.isBlank(platform)) {
-          platform = TTSPlatform.minimax;
+          platform = TTSPlatform.fishaudio;
+
         }
         if (StrUtil.isBlank(voice_id)) {
           // voice_id = BytePlusVoice.zh_female_cancan_mars_bigtts;
-          voice_id = MiniMaxVoice.English_magnetic_voiced_man;
-          language_boost = MinimaxLanguageBoost.ENGLISH.getCode();
+          // voice_id = MiniMaxVoice.English_magnetic_voiced_man;
+          // language_boost = MinimaxLanguageBoost.ENGLISH.getCode();
+          voice_id = FishAudioReference.English_Donald_J_Trump;
         }
       }
     }
 
     UniTTSResult result = manimTTSService.tts(input, platform, voice_id, language_boost);
     String path = result.getPath();
-    response.setHeader("path", path);
+    if (path != null) {
+      response.setHeader("path", path);
+    }
     File file = result.getData();
 
     // 生成 ETag

@@ -15,7 +15,7 @@ import com.litongjava.consts.UniTableName;
 import com.litongjava.db.activerecord.Db;
 import com.litongjava.db.activerecord.Row;
 import com.litongjava.fishaudio.tts.FishAudioClient;
-import com.litongjava.fishaudio.tts.FishAudioTTSRequestVo;
+import com.litongjava.fishaudio.tts.FishAudioTTSRequest;
 import com.litongjava.media.NativeMedia;
 import com.litongjava.minimax.MiniMaxHttpClient;
 import com.litongjava.minimax.MiniMaxTTSResponse;
@@ -89,7 +89,7 @@ public class UniTTSService {
       bodyBytes = VolceTtsClient.tts(input);
 
     } else if (TTSPlatform.fishaudio.equals(provider)) {
-      FishAudioTTSRequestVo vo = new FishAudioTTSRequestVo();
+      FishAudioTTSRequest vo = new FishAudioTTSRequest();
       vo.setText(input);
       vo.setReference_id(voice_id);
       ResponseVo responseVo = FishAudioClient.speech(vo);
