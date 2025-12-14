@@ -29,7 +29,7 @@ new UniAiAppConfig().config();
 ```
 ---
 ## TTS 
-# ## 1. 接口概述
+### 1. 接口概述
 
 TTS 模块用于将输入文本转换为语音，返回 MP3 格式的音频文件。系统根据输入文本的语言自动选择语音合成引擎：
 
@@ -67,7 +67,7 @@ api/manim/tts?token=123456&input=%E4%BB%8A%E5%A4%A9%E5%A4%A9%E6%B0%94%E6%80%8E%E
 
 ---
 
-##  缓存机制
+### 3.缓存机制
 
 为了减少重复调用第三方 TTS 服务及降低响应时间，系统实现了音频缓存机制：
 
@@ -77,3 +77,11 @@ api/manim/tts?token=123456&input=%E4%BB%8A%E5%A4%A9%E5%A4%A9%E6%B0%94%E6%80%8E%E
   - 缩短响应时间，提升接口响应效率。
 
 ---
+## TTS Model
+### matcha-icefall-zh-en
+```
+wget https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/matcha-icefall-zh-en.tar.bz2
+
+tar xvf matcha-icefall-zh-en.tar.bz2
+rm matcha-icefall-zh-en.tar.bz2
+```

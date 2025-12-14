@@ -26,6 +26,7 @@ public class TTSHandler implements HttpRequestHandler {
     String input = httpRequest.getParam("input");
     String platform = httpRequest.getParam("platform");
     String voice_id = httpRequest.getParam("voice_id");
+    boolean useCache = httpRequest.getBool("useCache");
 
     // 必须设置,否则cosine会读成希腊语
     String language_boost = "auto";
@@ -60,7 +61,7 @@ public class TTSHandler implements HttpRequestHandler {
       }
     }
 
-    UniTTSResult result = manimTTSService.tts(input, platform, voice_id, language_boost);
+    UniTTSResult result = manimTTSService.tts(input, platform, voice_id, language_boost, useCache);
     String path = result.getPath();
     if (path != null) {
       response.setHeader("path", path);

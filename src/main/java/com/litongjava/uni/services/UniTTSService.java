@@ -31,6 +31,7 @@ import com.litongjava.uni.consts.ResourcesContainer;
 import com.litongjava.uni.consts.UniConsts;
 import com.litongjava.uni.model.UniTTSResult;
 import com.litongjava.uni.tts.PooledNonStreamingTtsKokoroEn;
+import com.litongjava.uni.tts.PooledNonStreamingTtsMatchaZh;
 import com.litongjava.volcengine.VolceTtsClient;
 
 import lombok.extern.slf4j.Slf4j;
@@ -40,23 +41,25 @@ public class UniTTSService {
 
   private static final Striped<Lock> stripedLocks = Striped.lock(1024);
 
-  public UniTTSResult tts(String input, String provider, String voice_id, String language_boost) {
+  public UniTTSResult tts(String input, String provider, String voice_id, String language_boost, boolean useCache) {
 
     log.info("input: {}, provider: {}, voice_id: {},language_boost:{}", input, provider, voice_id, language_boost);
 
     // 2. 计算 MD5，并从数据库缓存表里查询是否已有生成记录
     String md5 = Md5Utils.md5Hex(input);
-    String sql = String.format("SELECT id, path FROM %s WHERE md5 = ? AND provider = ? AND voice = ?", UniTableName.UNI_TTS_CACHE);
-    Row row = Db.findFirst(sql, md5, provider, voice_id);
+    if (useCache) {
+      String sql = String.format("SELECT id, path FROM %s WHERE md5 = ? AND provider = ? AND voice = ?", UniTableName.UNI_TTS_CACHE);
+      Row row = Db.findFirst(sql, md5, provider, voice_id);
 
-    // 3. 如果查到了缓存记录，就尝试读取文件
-    if (row != null) {
-      long cacheId = row.getLong("id");
-      String path = row.getStr("path");
-      File cached = validCachedTts(path, cacheId);
-      if (cached != null) {
-        // 命中缓存且成功读取
-        return new UniTTSResult(path, cached);
+      // 3. 如果查到了缓存记录，就尝试读取文件
+      if (row != null) {
+        long cacheId = row.getLong("id");
+        String path = row.getStr("path");
+        File cached = validCachedTts(path, cacheId);
+        if (cached != null) {
+          // 命中缓存且成功读取
+          return new UniTTSResult(path, cached);
+        }
       }
     }
 
@@ -70,7 +73,7 @@ public class UniTTSService {
       if (!audioDir.exists()) {
         audioDir.mkdirs();
       }
-      return synthesis(input, provider, voice_id, language_boost, md5, cacheAudioDir);
+      return synthesis(input, provider, voice_id, language_boost, md5, cacheAudioDir, useCache);
     } finally {
       lock.unlock();
     }
@@ -79,7 +82,7 @@ public class UniTTSService {
 
   private UniTTSResult synthesis(String input, String provider, String voice_id, String language_boost,
       //
-      String md5, String cacheAudioDir) {
+      String md5, String cacheAudioDir, boolean useCache) {
     long id = SnowflakeIdUtils.id();
     String cacheFilePath = cacheAudioDir + File.separator + id + ".mp3";
     File audioFile = new File(cacheFilePath);
@@ -121,6 +124,17 @@ public class UniTTSService {
       } catch (InterruptedException e) {
         return new UniTTSResult(null, ResourcesContainer.default_mp3_bytes);
       }
+    } else if (TTSPlatform.local_matcha_cn.equals(provider)) {
+      try {
+        GeneratedAudio synthesize = PooledNonStreamingTtsMatchaZh.synthesize(input, 3, 1.0f);
+        String wavCacheFilePath = cacheAudioDir + File.separator + id + ".wav";
+        synthesize.save(wavCacheFilePath);
+        NativeMedia.toMp3(wavCacheFilePath);
+        new File(wavCacheFilePath).delete();
+        bodyBytes = FileUtil.readBytes(audioFile);
+      } catch (InterruptedException e) {
+        return new UniTTSResult(null, ResourcesContainer.default_mp3_bytes);
+      }
     } else {
       ResponseVo responseVo = OpenAiTTSClient.speech(input);
       if (responseVo.isOk()) {
@@ -136,14 +150,15 @@ public class UniTTSService {
       FileUtil.writeBytes(bodyBytes, audioFile);
     }
 
-    Row saveRow = Row.by("id", id).set("input", input).set("md5", md5).set("path", cacheFilePath).set("provider", provider).set("voice",
-        voice_id);
-    try {
-      Db.save(UniTableName.UNI_TTS_CACHE, saveRow);
-    } catch (Exception e) {
-      log.error(e.getMessage(), e);
+    if (useCache) {
+      Row saveRow = Row.by("id", id).set("input", input).set("md5", md5).set("path", cacheFilePath).set("provider", provider).set("voice",
+          voice_id);
+      try {
+        Db.save(UniTableName.UNI_TTS_CACHE, saveRow);
+      } catch (Exception e) {
+        log.error(e.getMessage(), e);
+      }
     }
-
     return new UniTTSResult(cacheFilePath, audioFile);
   }
 
