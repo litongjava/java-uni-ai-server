@@ -10,6 +10,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Data
 public class UniTTSResult {
+
   private String path;
   private File data;
+
+  public UniTTSResult(String path) {
+    this.path = path;
+    this.data = new File(path);
+  }
 }
