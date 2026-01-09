@@ -16,6 +16,9 @@ import com.litongjava.db.activerecord.Db;
 import com.litongjava.db.activerecord.Row;
 import com.litongjava.fishaudio.tts.FishAudioClient;
 import com.litongjava.fishaudio.tts.FishAudioTTSRequest;
+import com.litongjava.genie.GenieClient;
+import com.litongjava.genie.GenieTTSRequest;
+import com.litongjava.jfinal.aop.Aop;
 import com.litongjava.media.NativeMedia;
 import com.litongjava.minimax.MiniMaxHttpClient;
 import com.litongjava.minimax.MiniMaxTTSResponse;
@@ -48,7 +51,8 @@ public class UniTTSService {
     // 2. 计算 MD5，并从数据库缓存表里查询是否已有生成记录
     String md5 = Md5Utils.md5Hex(input);
     if (useCache) {
-      String sql = String.format("SELECT id, path FROM %s WHERE md5 = ? AND provider = ? AND voice = ?", UniTableName.UNI_TTS_CACHE);
+      String sql = String.format("SELECT id, path FROM %s WHERE md5 = ? AND provider = ? AND voice = ?",
+          UniTableName.UNI_TTS_CACHE);
       Row row = Db.findFirst(sql, md5, provider, voice_id);
 
       // 3. 如果查到了缓存记录，就尝试读取文件
@@ -88,9 +92,9 @@ public class UniTTSService {
     File audioFile = new File(cacheFilePath);
 
     byte[] bodyBytes = null;
+
     if (TTSPlatform.volce.equals(provider)) {
       bodyBytes = VolceTtsClient.tts(input);
-
     } else if (TTSPlatform.fishaudio.equals(provider)) {
       FishAudioTTSRequest vo = new FishAudioTTSRequest();
       vo.setText(input);
@@ -112,6 +116,11 @@ public class UniTTSService {
       BytePlusTTSHttpStreamClient client = new BytePlusTTSHttpStreamClient();
       BytePlusTTSAudio tts = client.tts(input, voice_id);
       bodyBytes = tts.getAudioBytes();
+      
+    } else if (TTSPlatform.genie.equals(provider)) {
+      GenieTTSRequest reqVo = new GenieTTSRequest(voice_id, input);
+      ResponseVo tts = Aop.get(GenieClient.class).tts(reqVo);
+      bodyBytes = tts.getBodyBytes();
 
     } else if (TTSPlatform.local_kokoro_en.equals(provider)) {
       try {
@@ -146,13 +155,15 @@ public class UniTTSService {
     }
 
     // 5. 将新生成的音频写到本地，并存一条缓存记录
-    if (!audioFile.exists()) {
+    if (!audioFile.exists())
+
+    {
       FileUtil.writeBytes(bodyBytes, audioFile);
     }
 
     if (useCache) {
-      Row saveRow = Row.by("id", id).set("input", input).set("md5", md5).set("path", cacheFilePath).set("provider", provider).set("voice",
-          voice_id);
+      Row saveRow = Row.by("id", id).set("input", input).set("md5", md5).set("path", cacheFilePath)
+          .set("provider", provider).set("voice", voice_id);
       try {
         Db.save(UniTableName.UNI_TTS_CACHE, saveRow);
       } catch (Exception e) {

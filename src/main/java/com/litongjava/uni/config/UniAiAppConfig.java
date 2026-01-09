@@ -5,7 +5,6 @@ import java.io.File;
 import com.litongjava.tio.boot.server.TioBootServer;
 import com.litongjava.tio.http.server.router.HttpRequestRouter;
 import com.litongjava.uni.consts.UniConsts;
-import com.litongjava.uni.handler.EmptyTTSHandler;
 import com.litongjava.uni.handler.SubtitleHandler;
 import com.litongjava.uni.handler.TTSHandler;
 
@@ -19,12 +18,12 @@ public class UniAiAppConfig {
     HttpRequestRouter r = server.getRequestRouter();
 
     if (r != null) {
-      TTSHandler manimTTSHandler = new TTSHandler();
-      r.add("/api/manim/tts", manimTTSHandler);
-      r.add("/tts", manimTTSHandler);
+      TTSHandler ttsHandler = new TTSHandler();
+      r.add("/api/manim/tts", ttsHandler);
+      r.add("/tts", ttsHandler);
       
-      EmptyTTSHandler emptyTTSHandler = new EmptyTTSHandler();
-      r.add("/api/mv/tts", emptyTTSHandler);
+      //EmptyTTSHandler emptyTTSHandler = new EmptyTTSHandler();
+      r.add("/api/mv/tts", ttsHandler);
       
       SubtitleHandler subtitleHandler = new SubtitleHandler();
       r.add("/subtitle", subtitleHandler);

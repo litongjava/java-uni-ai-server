@@ -2,13 +2,18 @@ package com.litongjava.uni.handler;
 
 import java.io.File;
 
+import com.litongjava.byteplus.BytePlusVoice;
 import com.litongjava.fishaudio.tts.FishAudioReference;
+import com.litongjava.genie.GenieCharacter;
 import com.litongjava.jfinal.aop.Aop;
+import com.litongjava.minimax.MiniMaxVoice;
+import com.litongjava.minimax.MinimaxLanguageBoost;
 import com.litongjava.tio.boot.http.TioRequestContext;
 import com.litongjava.tio.boot.utils.HttpFileDataUtils;
 import com.litongjava.tio.http.common.HttpRequest;
 import com.litongjava.tio.http.common.HttpResponse;
 import com.litongjava.tio.http.server.handler.HttpRequestHandler;
+import com.litongjava.tio.utils.environment.EnvUtils;
 import com.litongjava.tio.utils.http.ContentTypeUtils;
 import com.litongjava.tio.utils.hutool.FilenameUtils;
 import com.litongjava.tio.utils.hutool.StrUtil;
@@ -37,26 +42,40 @@ public class TTSHandler implements HttpRequestHandler {
       if (ChineseDetector.isChinese(input)) {
         if (StrUtil.isBlank(platform)) {
           // platform = TTSPlatform.minimax;
-          platform = TTSPlatform.fishaudio;
+//          platform = TTSPlatform.fishaudio;
+          platform = EnvUtils.getStr("tts.platform", TTSPlatform.genie);
 
         }
         if (StrUtil.isBlank(voice_id)) {
-//          voice_id = BytePlusVoice.zh_female_cancan_mars_bigtts;
-//          voice_id = MiniMaxVoice.Chinese_Mandarin_Gentleman;
-//          language_boost = MinimaxLanguageBoost.CHINESE.getCode();
-          voice_id = FishAudioReference.Chinese_Lei_Jun;
+          if (TTSPlatform.fishaudio.equals(platform)) {
+            voice_id = FishAudioReference.Chinese_Lei_Jun;
 
+          } else if (TTSPlatform.minimax.equals(platform)) {
+            voice_id = MiniMaxVoice.Chinese_Mandarin_Gentleman;
+            language_boost = MinimaxLanguageBoost.CHINESE.getCode();
+
+          } else if (TTSPlatform.byteplus.equals(platform)) {
+            voice_id = BytePlusVoice.zh_female_cancan_mars_bigtts;
+
+          } else if (TTSPlatform.genie.equals(platform)) {
+            voice_id = GenieCharacter.feibi;
+          }
         }
       } else {
         if (StrUtil.isBlank(platform)) {
-          platform = TTSPlatform.fishaudio;
-
+          platform = EnvUtils.getStr("tts.platform", TTSPlatform.genie);
         }
         if (StrUtil.isBlank(voice_id)) {
-          // voice_id = BytePlusVoice.zh_female_cancan_mars_bigtts;
-          // voice_id = MiniMaxVoice.English_magnetic_voiced_man;
-          // language_boost = MinimaxLanguageBoost.ENGLISH.getCode();
-          voice_id = FishAudioReference.English_Donald_J_Trump;
+          if (TTSPlatform.fishaudio.equals(platform)) {
+            voice_id = FishAudioReference.English_Donald_J_Trump;
+          } else if (TTSPlatform.minimax.equals(platform)) {
+            voice_id = MiniMaxVoice.English_magnetic_voiced_man;
+            language_boost = MinimaxLanguageBoost.ENGLISH.getCode();
+          } else if (TTSPlatform.byteplus.equals(platform)) {
+            voice_id = BytePlusVoice.zh_female_cancan_mars_bigtts;
+          } else if (TTSPlatform.genie.equals(platform)) {
+            voice_id = GenieCharacter.thirtyseven;
+          }
         }
       }
     }
