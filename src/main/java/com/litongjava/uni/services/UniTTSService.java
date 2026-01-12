@@ -24,10 +24,16 @@ import com.litongjava.minimax.MiniMaxHttpClient;
 import com.litongjava.minimax.MiniMaxTTSResponse;
 import com.litongjava.model.http.response.ResponseVo;
 import com.litongjava.openai.tts.OpenAiTTSClient;
+import com.litongjava.tio.core.ChannelContext;
+import com.litongjava.tio.core.Tio;
+import com.litongjava.tio.http.common.encoder.ChunkEncoder;
+import com.litongjava.tio.http.common.sse.ChunkedPacket;
+import com.litongjava.tio.http.server.util.SseEmitter;
 import com.litongjava.tio.utils.crypto.Md5Utils;
 import com.litongjava.tio.utils.hex.HexUtils;
 import com.litongjava.tio.utils.hutool.FileUtil;
 import com.litongjava.tio.utils.hutool.StrUtil;
+import com.litongjava.tio.utils.json.JsonUtils;
 import com.litongjava.tio.utils.snowflake.SnowflakeIdUtils;
 import com.litongjava.tts.TTSPlatform;
 import com.litongjava.uni.consts.ResourcesContainer;
@@ -38,6 +44,8 @@ import com.litongjava.uni.tts.PooledNonStreamingTtsMatchaZh;
 import com.litongjava.volcengine.VolceTtsClient;
 
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.sse.EventSource;
+import okhttp3.sse.EventSourceListener;
 
 @Slf4j
 public class UniTTSService {
@@ -116,7 +124,7 @@ public class UniTTSService {
       BytePlusTTSHttpStreamClient client = new BytePlusTTSHttpStreamClient();
       BytePlusTTSAudio tts = client.tts(input, voice_id);
       bodyBytes = tts.getAudioBytes();
-      
+
     } else if (TTSPlatform.genie.equals(provider)) {
       GenieTTSRequest reqVo = new GenieTTSRequest(voice_id, input);
       ResponseVo tts = Aop.get(GenieClient.class).tts(reqVo);
@@ -155,9 +163,7 @@ public class UniTTSService {
     }
 
     // 5. 将新生成的音频写到本地，并存一条缓存记录
-    if (!audioFile.exists())
-
-    {
+    if (!audioFile.exists()) {
       FileUtil.writeBytes(bodyBytes, audioFile);
     }
 
@@ -205,5 +211,27 @@ public class UniTTSService {
       return null;
     }
     return null;
+  }
+
+  public void stream(ChannelContext channelContext, String input, String platform, String voice_id,
+      String language_boost, boolean useCache) {
+
+    EventSourceListener listener = new EventSourceListener() {
+      @Override
+      public void onEvent(EventSource eventSource, String id, String type, String data) {
+        MiniMaxTTSResponse speech = JsonUtils.parse(data, MiniMaxTTSResponse.class);
+        String audioHex = speech.getData().getAudio();
+        byte[] audioBytes = HexUtils.decodeHex(audioHex);
+        ChunkedPacket ssePacket = new ChunkedPacket(ChunkEncoder.encodeChunk(audioBytes));
+        Tio.bSend(channelContext, ssePacket);
+      }
+
+      @Override
+      public void onClosed(EventSource eventSource) {
+        SseEmitter.closeChunkConnection(channelContext);
+      }
+    };
+    MiniMaxHttpClient.speechStream(input, voice_id, language_boost, listener);
+
   }
 }

@@ -7,6 +7,7 @@ import com.litongjava.tio.http.server.router.HttpRequestRouter;
 import com.litongjava.uni.consts.UniConsts;
 import com.litongjava.uni.handler.SubtitleHandler;
 import com.litongjava.uni.handler.TTSHandler;
+import com.litongjava.uni.handler.TTSStreamHandler;
 
 public class UniAiAppConfig {
 
@@ -27,6 +28,9 @@ public class UniAiAppConfig {
       
       SubtitleHandler subtitleHandler = new SubtitleHandler();
       r.add("/subtitle", subtitleHandler);
+      
+      TTSStreamHandler ttsStreamHandler = new TTSStreamHandler();
+      r.add("/api/mv/tts/stream", ttsStreamHandler);
     }
   }
 }
