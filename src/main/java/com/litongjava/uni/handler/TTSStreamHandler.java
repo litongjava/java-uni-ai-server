@@ -49,7 +49,10 @@ public class TTSStreamHandler implements HttpRequestHandler {
     String input = httpRequest.getParam("input");
     String platform = httpRequest.getParam("platform");
     String voice_id = httpRequest.getParam("voice_id");
-    boolean useCache = httpRequest.getBool("useCache");
+    Boolean useCache = httpRequest.getBoolean("useCache");
+    if (useCache == null) {
+      useCache = true;
+    }
 
     // 必须设置,否则cosine会读成希腊语
     String language_boost = "auto";
