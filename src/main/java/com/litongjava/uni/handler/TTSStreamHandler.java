@@ -14,6 +14,7 @@ import com.litongjava.tio.http.common.HeaderValue;
 import com.litongjava.tio.http.common.HttpRequest;
 import com.litongjava.tio.http.common.HttpResponse;
 import com.litongjava.tio.http.server.handler.HttpRequestHandler;
+import com.litongjava.tio.http.server.util.CORSUtils;
 import com.litongjava.tio.utils.environment.EnvUtils;
 import com.litongjava.tio.utils.http.ContentTypeUtils;
 import com.litongjava.tio.utils.hutool.StrUtil;
@@ -41,6 +42,7 @@ public class TTSStreamHandler implements HttpRequestHandler {
     // 设置响应头
     response.addHeader(HeaderName.Transfer_Encoding, HeaderValue.from("chunked"));
     response.addHeader(HeaderName.Content_Type, HeaderValue.from(contentType));
+    CORSUtils.enableCORS(response);
 
     // 发送初始响应头,客户端会自动保持连接
     Tio.send(channelContext, response);
