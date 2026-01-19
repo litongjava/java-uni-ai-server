@@ -118,7 +118,11 @@ public class UniTTSService {
 
     } else if (TTSPlatform.minimax.equals(provider)) {
       MiniMaxTTSResponse speech = MiniMaxHttpClient.speech(input, voice_id, language_boost);
-      String audioHex = speech.getData().getAudio();
+      MiniMaxResponseData data = speech.getData();
+      if (data == null) {
+        log.error(speech.getRawResponse());
+      }
+      String audioHex = data.getAudio();
       bodyBytes = HexUtils.decodeHex(audioHex);
 
     } else if (TTSPlatform.byteplus.equals(provider)) {

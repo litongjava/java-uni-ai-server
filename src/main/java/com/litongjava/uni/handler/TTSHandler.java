@@ -46,7 +46,7 @@ public class TTSHandler implements HttpRequestHandler {
         if (StrUtil.isBlank(platform)) {
           // platform = TTSPlatform.minimax;
 //          platform = TTSPlatform.fishaudio;
-          platform = EnvUtils.getStr("tts.platform", TTSPlatform.genie);
+          platform = EnvUtils.getStr("tts.platform", TTSPlatform.minimax);
 
         }
         if (StrUtil.isBlank(voice_id)) {
@@ -66,7 +66,7 @@ public class TTSHandler implements HttpRequestHandler {
         }
       } else {
         if (StrUtil.isBlank(platform)) {
-          platform = EnvUtils.getStr("tts.platform", TTSPlatform.genie);
+          platform = EnvUtils.getStr("tts.platform", TTSPlatform.minimax);
         }
         if (StrUtil.isBlank(voice_id)) {
           if (TTSPlatform.fishaudio.equals(platform)) {
