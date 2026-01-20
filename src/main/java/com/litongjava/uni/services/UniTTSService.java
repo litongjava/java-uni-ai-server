@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 
 import com.google.common.util.concurrent.Striped;
@@ -27,6 +28,7 @@ import com.litongjava.model.http.response.ResponseVo;
 import com.litongjava.openai.tts.OpenAiTTSClient;
 import com.litongjava.tio.core.ChannelContext;
 import com.litongjava.tio.core.Tio;
+import com.litongjava.tio.http.common.HttpResponse;
 import com.litongjava.tio.http.common.encoder.ChunkEncoder;
 import com.litongjava.tio.http.common.sse.ChunkedPacket;
 import com.litongjava.tio.http.server.util.SseEmitter;
@@ -218,9 +220,10 @@ public class UniTTSService {
     return null;
   }
 
-  public void stream(ChannelContext channelContext, String input, String platform, String voice_id,
-      String language_boost, boolean useCache) {
+  public void stream(HttpResponse response, ChannelContext channelContext, String input, String platform,
+      String voice_id, String language_boost, boolean useCache) {
 
+    log.info("input: {}, provider: {}, voice_id: {},language_boost:{}", input, platform, voice_id, language_boost);
     // 1) 计算 md5（与非流式逻辑一致）
     String md5 = Md5Utils.md5Hex(input);
 
@@ -236,7 +239,7 @@ public class UniTTSService {
         if (cached != null) {
           // 命中缓存：直接把文件按 chunk 写回客户端并关闭连接
           streamFileAsChunked(channelContext, cached);
-          SseEmitter.closeChunkConnection(channelContext);
+          SseEmitter.closeChunkConnectionImmediately(channelContext);
           return;
         }
       }
@@ -265,8 +268,14 @@ public class UniTTSService {
 
     EventSourceListener listener = new EventSourceListener() {
 
+      AtomicBoolean headerSent = new AtomicBoolean(false);
+
       @Override
       public void onEvent(EventSource eventSource, String idStr, String type, String data) {
+        if (!headerSent.get()) {
+          headerSent.set(true);
+          Tio.bSend(channelContext, response);
+        }
         try {
           MiniMaxTTSResponse speech = JsonUtils.parse(data, MiniMaxTTSResponse.class);
           MiniMaxResponseData audioData = speech.getData();
@@ -283,7 +292,7 @@ public class UniTTSService {
 
             // 1) 写回浏览器（chunked）
             ChunkedPacket packet = new ChunkedPacket(ChunkEncoder.encodeChunk(audioBytes));
-            Tio.bSend(channelContext, packet);
+            Tio.send(channelContext, packet);
 
             // 2) 同步落盘
             if (fosRef[0] != null) {
@@ -294,7 +303,7 @@ public class UniTTSService {
           log.error("stream onEvent error", e);
           // 出错直接关闭连接
           safeCloseOutput(fosRef[0]);
-          SseEmitter.closeChunkConnection(channelContext);
+          SseEmitter.closeChunkConnectionImmediately(channelContext);
           eventSource.cancel();
         }
       }
@@ -305,7 +314,7 @@ public class UniTTSService {
         safeCloseOutput(fosRef[0]);
 
         // 结束 chunked 连接
-        SseEmitter.closeChunkConnection(channelContext);
+        SseEmitter.closeChunkConnectionImmediately(channelContext);
 
         // onClosed 入库（useCache=true 才入库）
         if (!useCache) {
@@ -367,7 +376,7 @@ public class UniTTSService {
           }
         }
 
-        SseEmitter.closeChunkConnection(channelContext);
+        SseEmitter.closeChunkConnectionImmediately(channelContext);
       }
     };
 

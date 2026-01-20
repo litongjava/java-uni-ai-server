@@ -8,7 +8,6 @@ import com.litongjava.minimax.MiniMaxVoice;
 import com.litongjava.minimax.MinimaxLanguageBoost;
 import com.litongjava.tio.boot.http.TioRequestContext;
 import com.litongjava.tio.core.ChannelContext;
-import com.litongjava.tio.core.Tio;
 import com.litongjava.tio.http.common.HeaderName;
 import com.litongjava.tio.http.common.HeaderValue;
 import com.litongjava.tio.http.common.HttpRequest;
@@ -22,11 +21,15 @@ import com.litongjava.tio.utils.lang.ChineseDetector;
 import com.litongjava.tts.TTSPlatform;
 import com.litongjava.uni.services.UniTTSService;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class TTSStreamHandler implements HttpRequestHandler {
   UniTTSService manimTTSService = Aop.get(UniTTSService.class);
 
   @Override
   public HttpResponse handle(HttpRequest httpRequest) throws Exception {
+    log.info("request id:" + httpRequest.getId());
     // 获取channelContext
     ChannelContext channelContext = httpRequest.getChannelContext();
 
@@ -44,8 +47,6 @@ public class TTSStreamHandler implements HttpRequestHandler {
     response.addHeader(HeaderName.Content_Type, HeaderValue.from(contentType));
     CORSUtils.enableCORS(response);
 
-    // 发送初始响应头,客户端会自动保持连接
-    Tio.send(channelContext, response);
     response.setSend(false);
 
     String input = httpRequest.getParam("input");
@@ -103,7 +104,7 @@ public class TTSStreamHandler implements HttpRequestHandler {
       }
     }
 
-    manimTTSService.stream(channelContext, input, platform, voice_id, language_boost, useCache);
+    manimTTSService.stream(response,channelContext, input, platform, voice_id, language_boost, useCache);
 
     return response;
   }
