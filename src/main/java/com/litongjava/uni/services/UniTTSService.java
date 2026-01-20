@@ -237,6 +237,7 @@ public class UniTTSService {
         String path = row.getStr("path");
         File cached = validCachedTts(path, cacheId);
         if (cached != null) {
+          Tio.bSend(channelContext, response);
           // 命中缓存：直接把文件按 chunk 写回客户端并关闭连接
           streamFileAsChunked(channelContext, cached);
           SseEmitter.closeChunkConnectionImmediately(channelContext);
