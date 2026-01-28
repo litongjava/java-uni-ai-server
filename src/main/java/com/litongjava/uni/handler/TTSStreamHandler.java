@@ -92,11 +92,14 @@ public class TTSStreamHandler implements HttpRequestHandler {
         if (StrUtil.isBlank(voice_id)) {
           if (TTSPlatform.fishaudio.equals(platform)) {
             voice_id = FishAudioReference.English_Donald_J_Trump;
+          
           } else if (TTSPlatform.minimax.equals(platform)) {
-            voice_id = MiniMaxVoice.English_magnetic_voiced_man;
+            voice_id = MiniMaxVoice.English_Explanatory_Man;
             language_boost = MinimaxLanguageBoost.ENGLISH.getCode();
+          
           } else if (TTSPlatform.byteplus.equals(platform)) {
             voice_id = BytePlusVoice.zh_female_cancan_mars_bigtts;
+          
           } else if (TTSPlatform.genie.equals(platform)) {
             voice_id = GenieCharacter.thirtyseven;
           }
