@@ -1,0 +1,14 @@
+[Unit]
+Description=java-uni-ai-server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/data/apps/java-uni-ai-server
+ExecStart=/usr/java/jdk-21.0.6/bin/java -jar java-uni-ai-server-1.0.0.jar --server.port=10054
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
