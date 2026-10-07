@@ -13,6 +13,8 @@ import com.k2fsa.sherpa.onnx.GeneratedAudio;
 import com.litongjava.media.NativeMedia;
 
 import lombok.extern.slf4j.Slf4j;
+import nexus.io.bailian.BailianTTSClient;
+import nexus.io.bailian.tts.BailianTTSResponse;
 import nexus.io.byteplus.BytePlusTTSAudio;
 import nexus.io.byteplus.BytePlusTTSHttpStreamClient;
 import nexus.io.consts.UniTableName;
@@ -41,6 +43,7 @@ import nexus.io.tio.http.common.encoder.ChunkEncoder;
 import nexus.io.tio.http.server.util.SseEmitter;
 import nexus.io.tio.utils.crypto.Md5Utils;
 import nexus.io.tio.utils.hex.HexUtils;
+import nexus.io.tio.utils.http.HttpUtils;
 import nexus.io.tio.utils.hutool.FileUtil;
 import nexus.io.tio.utils.hutool.StrUtil;
 import nexus.io.tio.utils.json.JsonUtils;
@@ -54,9 +57,12 @@ import okhttp3.sse.EventSourceListener;
 public class UniTTSService {
 
   private static final Striped<Lock> stripedLocks = Striped.lock(1024);
+  BytePlusTTSHttpStreamClient bytePlusTTSHttpStreamClient = Aop.get(BytePlusTTSHttpStreamClient.class);
+  BailianTTSClient bailianTTSClient = Aop.get(BailianTTSClient.class);
 
   public UniTTSResult tts(String input, String provider, String voice_id, String language_boost, boolean useCache) {
 
+    // 1. print log
     log.info("input: {}, provider: {}, voice_id: {},language_boost:{}", input, provider, voice_id, language_boost);
 
     // 2. 计算 MD5，并从数据库缓存表里查询是否已有生成记录
@@ -82,7 +88,6 @@ public class UniTTSService {
     lock.lock();
     try {
       // 4. 如果缓存无效或不存在，就生成新的音频并写入缓存
-
       String cacheAudioDir = UniConsts.DATA_DIR + File.separator + "audio";
       File audioDir = new File(cacheAudioDir);
       if (!audioDir.exists()) {
@@ -106,6 +111,7 @@ public class UniTTSService {
 
     if (TTSPlatform.volce.equals(provider)) {
       bodyBytes = VolceTtsClient.tts(input);
+
     } else if (TTSPlatform.fishaudio.equals(provider)) {
       FishAudioTTSRequest vo = new FishAudioTTSRequest();
       vo.setText(input);
@@ -128,9 +134,18 @@ public class UniTTSService {
       bodyBytes = HexUtils.decodeHex(audioHex);
 
     } else if (TTSPlatform.byteplus.equals(provider)) {
-      BytePlusTTSHttpStreamClient client = new BytePlusTTSHttpStreamClient();
-      BytePlusTTSAudio tts = client.tts(input, voice_id);
+
+      BytePlusTTSAudio tts = bytePlusTTSHttpStreamClient.tts(input, voice_id);
       bodyBytes = tts.getAudioBytes();
+
+    } else if (TTSPlatform.bailian.equals(provider)) {
+      String model = "cosyvoice-v3.5-plus";
+      BailianTTSResponse response = bailianTTSClient.tts(model, voice_id, input);
+      String url = response.getOutput().getAudio().getUrl();
+      ResponseVo responseVo = HttpUtils.download(url);
+      if (responseVo.isOk()) {
+        bodyBytes = responseVo.getBodyBytes();
+      }
 
     } else if (TTSPlatform.genie.equals(provider)) {
       GenieTTSRequest reqVo = new GenieTTSRequest(voice_id, input);

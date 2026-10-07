@@ -36,53 +36,54 @@ public class TTSHandler implements HttpRequestHandler {
       useCache = true;
     }
 
+    if (StrUtil.isBlank(platform)) {
+      platform = EnvUtils.getStr("tts.platform", TTSPlatform.minimax);
+    }
+
     // 必须设置,否则cosine会读成希腊语
     String language_boost = "auto";
 
-    if (StrUtil.isEmpty(platform)) {
-      // 1. 根据输入文本内容判断默认 provider 和 voice_id
+    // 1. 根据输入文本内容判断默认 provider 和 voice_id
+    if (ChineseDetector.isChinese(input)) {
+      if (StrUtil.isBlank(voice_id)) {
+        if (TTSPlatform.fishaudio.equals(platform)) {
+          voice_id = FishAudioReference.Chinese_Lei_Jun;
 
-      if (ChineseDetector.isChinese(input)) {
-        if (StrUtil.isBlank(platform)) {
-          // platform = TTSPlatform.minimax;
-//          platform = TTSPlatform.fishaudio;
-          platform = EnvUtils.getStr("tts.platform", TTSPlatform.minimax);
+        } else if (TTSPlatform.minimax.equals(platform)) {
+          voice_id = MiniMaxVoice.Chinese_Mandarin_Gentleman;
+          language_boost = MinimaxLanguageBoost.CHINESE.getCode();
 
-        }
-        if (StrUtil.isBlank(voice_id)) {
-          if (TTSPlatform.fishaudio.equals(platform)) {
-            voice_id = FishAudioReference.Chinese_Lei_Jun;
+        } else if (TTSPlatform.byteplus.equals(platform)) {
+          voice_id = BytePlusVoice.zh_female_cancan_mars_bigtts;
 
-          } else if (TTSPlatform.minimax.equals(platform)) {
-            voice_id = MiniMaxVoice.Chinese_Mandarin_Gentleman;
-            language_boost = MinimaxLanguageBoost.CHINESE.getCode();
+        } else if (TTSPlatform.genie.equals(platform)) {
+          voice_id = GenieCharacter.feibi;
 
-          } else if (TTSPlatform.byteplus.equals(platform)) {
-            voice_id = BytePlusVoice.zh_female_cancan_mars_bigtts;
-
-          } else if (TTSPlatform.genie.equals(platform)) {
-            voice_id = GenieCharacter.feibi;
-          }
-        }
-      } else {
-        if (StrUtil.isBlank(platform)) {
-          platform = EnvUtils.getStr("tts.platform", TTSPlatform.minimax);
-        }
-        if (StrUtil.isBlank(voice_id)) {
-          if (TTSPlatform.fishaudio.equals(platform)) {
-            voice_id = FishAudioReference.English_Donald_J_Trump;
-          } else if (TTSPlatform.minimax.equals(platform)) {
-            voice_id = MiniMaxVoice.English_magnetic_voiced_man;
-            language_boost = MinimaxLanguageBoost.ENGLISH.getCode();
-          } else if (TTSPlatform.byteplus.equals(platform)) {
-            voice_id = BytePlusVoice.zh_female_cancan_mars_bigtts;
-          } else if (TTSPlatform.genie.equals(platform)) {
-            voice_id = GenieCharacter.thirtyseven;
-          }
+        } else if (TTSPlatform.bailian.equals(platform)) {
+          voice_id = "cosyvoice-v3.5-plus-bailian-e46c4292e6504f808be470fe6f9c8b93";
         }
       }
-    }
+    } else {
+      if (StrUtil.isBlank(voice_id)) {
+        if (TTSPlatform.fishaudio.equals(platform)) {
+          voice_id = FishAudioReference.English_Donald_J_Trump;
+        
+        } else if (TTSPlatform.minimax.equals(platform)) {
+          voice_id = MiniMaxVoice.English_magnetic_voiced_man;
+          language_boost = MinimaxLanguageBoost.ENGLISH.getCode();
+        
+        } else if (TTSPlatform.byteplus.equals(platform)) {
+          voice_id = BytePlusVoice.zh_female_cancan_mars_bigtts;
+        
+        } else if (TTSPlatform.genie.equals(platform)) {
+          voice_id = GenieCharacter.thirtyseven;
+        
+        } else if (TTSPlatform.bailian.equals(platform)) {
+          voice_id = "cosyvoice-v3.5-plus-bailian-e46c4292e6504f808be470fe6f9c8b93";
+        }
+      }
 
+    }
     UniTTSResult result = manimTTSService.tts(input, platform, voice_id, language_boost, useCache);
     String path = result.getPath();
     if (path != null) {
